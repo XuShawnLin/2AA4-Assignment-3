@@ -1,4 +1,4 @@
-# 2AA4-Assignment-2
+# 2AA4-Assignment-3
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=XuShawnLin_2AA4-Assignment-2&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=XuShawnLin_2AA4-Assignment-2)
 
 **Names:** 
@@ -7,7 +7,7 @@
 - Xu(Shawn) Lin (Linx45@mcmaster.ca, Linx45)
 - Subha Ratti (Rattis4@mcmaster.ca, Rattis4)
 
-**Date:** March 5th, 2026
+**Date:** March 20th, 2026
 **Course:** SFWRENG 2AA4
 
 This repository contains the related files for Assignment 2 for simulating the game Catan.
