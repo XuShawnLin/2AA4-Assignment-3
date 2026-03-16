@@ -10,7 +10,7 @@
 **Date:** March 20th, 2026
 **Course:** SFWRENG 2AA4
 
-This repository contains the related files for Assignment 2 for simulating the game Catan.
+This repository contains the related files for Assignment 3 for simulating the game Catan.
 
 ## Build and Test
 This project uses [Maven](https://maven.apache.org/) as its build system. 
