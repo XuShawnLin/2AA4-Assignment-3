@@ -1,4 +1,4 @@
-package A2;
+package A3;
 
 /**
  * Handles resource distribution for a given dice roll (SRP).

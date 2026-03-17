@@ -1,4 +1,4 @@
-package A2;
+package A3;
 
 /**
  * Enumeration representing different types of game pieces.
