@@ -13,10 +13,12 @@ public class HumanPlayer extends Player {
 
     private final Scanner scanner;
     private static final Logger LOGGER = Logger.getLogger(HumanPlayer.class.getName());
+    private final CommandManager commandManager; //Added command manager method for undo/redo
 
     public HumanPlayer(String name) {
         super(name);
         this.scanner = new Scanner(System.in);
+        this.commandManager = new CommandManager(); //Initalizating with new command manager
     }
 
     /**
@@ -61,7 +63,7 @@ public class HumanPlayer extends Player {
 
 
         while (!turnFinished) {
-            LOGGER.info("Command (Roll, Build, List, Go): ");
+            LOGGER.info("Command (Roll, Build, Undo, Redo, List, Go): "); //Updated to include undo/redo
             String input = scanner.nextLine().trim().toLowerCase();
 
             switch (input) {
@@ -103,6 +105,22 @@ public class HumanPlayer extends Player {
                     }
                     break;
 
+                case "undo": //Added new undo case for player move and for logger
+                    if (commandManager.undo()) {
+                        LOGGER.info("Undo successful.");
+                    } else {
+                        LOGGER.info("Nothing to undo.");
+                    }
+                    break;
+
+                case "redo": //Added new redo case for player move and for logger
+                    if (commandManager.redo()) {
+                        LOGGER.info("Redo successful.");
+                    } else {
+                        LOGGER.info("Nothing to redo.");
+                    }
+                    break;
+
                 default:
                     LOGGER.info("Unknown command.");
             }
@@ -130,18 +148,20 @@ public class HumanPlayer extends Player {
                     return;
                 }
 
-                Node settlementNode = chooseBuildNode(board, false); // normal gameplay
+                Node settlementNode = chooseSettlementNode(board); //changed to follow rules of choosing settlement node
                 if (settlementNode == null) return; // back option
 
-                if (buildService.buildSettlement(this, settlementNode, board)) {
-                    removeResource(ResourceType.BRICK, 1);
-                    removeResource(ResourceType.LUMBER, 1);
-                    removeResource(ResourceType.WOOL, 1);
-                    removeResource(ResourceType.GRAIN, 1);
-                    LOGGER.log(Level.INFO, "{0}: built a settlement on node {1}", new Object[]{getName(), settlementNode.getId()});
-                } else {
+                BuildSettlementCommand buildSettlementCommand = new BuildSettlementCommand(buildService, this, settlementNode, board); //created the needed command object here instead of direct build logic
+
+                commandManager.executeCommand(buildSettlementCommand); //executes command and stores in history so undo/redo can be used later
+
+                if (buildSettlementCommand.wasDone()) { //if command done then build the settlement
+                    LOGGER.log(Level.INFO, "{0}: built a settlement on node {1}",
+                            new Object[]{getName(), settlementNode.getId()});
+                } else { //error if cant be built
                     LOGGER.info("Cannot build settlement there.");
                 }
+
                 break;
 
             case "city":
@@ -152,16 +172,20 @@ public class HumanPlayer extends Player {
                     return;
                 }
 
-                Node cityNode = chooseBuildNode(board, false); // normal gameplay
+                Node cityNode = chooseCityNode(board); //changed to follow rules of choosing city node
                 if (cityNode == null) return; // back option
 
-                if (buildService.buildCity(this, cityNode, board)) {
-                    removeResource(ResourceType.GRAIN, 2);
-                    removeResource(ResourceType.ORE, 3);
-                    LOGGER.log(Level.INFO, "{0}: built a city on node {1}", new Object[]{getName(), cityNode.getId()});
-                } else {
+                BuildCityCommand buildCityCommand = new BuildCityCommand(buildService, this, cityNode, board); //created the needed command object here instead of direct build logic
+
+                commandManager.executeCommand(buildCityCommand); //executes command and stores in history so undo/redo can be used later
+
+                if (buildCityCommand.wasDone()) { //if command done then build the city
+                    LOGGER.log(Level.INFO, "{0}: built a city on node {1}",
+                            new Object[]{getName(), cityNode.getId()});
+                } else { //error if cant be built
                     LOGGER.info("Cannot build city there.");
                 }
+
                 break;
 
             case "road":
@@ -175,13 +199,17 @@ public class HumanPlayer extends Player {
                 Edge edge = chooseBuildEdge(board);
                 if (edge == null) return; // back option
 
-                if (buildService.buildRoad(this, edge, board)) {
-                    removeResource(ResourceType.BRICK, 1);
-                    removeResource(ResourceType.LUMBER, 1);
-                    LOGGER.log(Level.INFO, "{0}: built a road on edge {1}", new Object[]{getName(), edge.getId()});
-                } else {
+                BuildRoadCommand buildRoadCommand = new BuildRoadCommand(buildService, this, edge, board); //created the needed command object here instead of direct build logic
+
+                commandManager.executeCommand(buildRoadCommand); //executes command and stores in history so undo/redo can be used later
+
+                if (buildRoadCommand.wasDone()) { //if command done then build the road
+                    LOGGER.log(Level.INFO, "{0}: built a road on edge {1}",
+                            new Object[]{getName(), edge.getId()});
+                } else { //error if cant be built
                     LOGGER.info("Cannot build road there.");
                 }
+
                 break;
 
             case "back":
@@ -192,33 +220,6 @@ public class HumanPlayer extends Player {
                 LOGGER.info("Unknown build type.");
                 break;
         }
-    }
-
-    // Choose node to build (normal gameplay or initial placement)
-    private Node chooseBuildNode(Board board, boolean initialPlacement) {
-        Node chosenNode = null;
-        while (chosenNode == null) {
-            System.out.print("Enter node id or 'back': ");
-            String input = scanner.nextLine().trim();
-            if (input.equalsIgnoreCase("back")) return null;
-
-            try {
-                int nodeId = Integer.parseInt(input);
-                Node node = board.getNodes().stream()
-                        .filter(n -> n.getId() == nodeId)
-                        .findFirst()
-                        .orElse(null);
-
-                if (node != null && board.isValidSettlement(node, this, initialPlacement)) {
-                    chosenNode = node;
-                } else {
-                    System.out.println("Cannot build there. Try again.");
-                }
-            } catch (NumberFormatException e) {
-                System.out.println("Please enter a valid number.");
-            }
-        }
-        return chosenNode;
     }
 
     private Edge chooseBuildEdge(Board board) {
@@ -247,5 +248,71 @@ public class HumanPlayer extends Player {
         return chosenEdge;
     }
 
+    private Node chooseSettlementNode(Board board) { //Builds off of the original chooseBuildNode method but specifally for settlements
+        Node chosenNode = null;
+
+        while (chosenNode == null) { //keep asking until a valid node is selected or the player cancels
+            System.out.print("Enter node id or 'back': ");
+            String input = scanner.nextLine().trim();
+
+            if (input.equalsIgnoreCase("back")) { //lets player cancel the build action
+                return null;
+            }
+
+            try {
+                int nodeId = Integer.parseInt(input); //convert user input to a node id
+                Node node = board.getNodes().stream() //find matching node
+                        .filter(n -> n.getId() == nodeId)
+                        .findFirst()
+                        .orElse(null);
+
+                if (node != null && board.isValidSettlement(node, this, false)) { //check if  node exists and if a settlement can be built there
+                    chosenNode = node;
+                } else {
+                    System.out.println("Cannot build settlement there.");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Enter a valid number.");
+            }
+        }
+
+        return chosenNode;
+    }
+
+    private Node chooseCityNode(Board board) { //Builds off of the original chooseBuildNode method but specifally for cities
+        Node chosenNode = null;
+
+        while (chosenNode == null) { //keep asking until a valid node is selected or the player cancels
+            System.out.print("Enter settlement node id to upgrade or 'back': ");
+            String input = scanner.nextLine().trim();
+
+            if (input.equalsIgnoreCase("back")) { //lets player cancel the build action
+                return null;
+            }
+
+            try {
+                int nodeId = Integer.parseInt(input); //convert user input to a node id
+                Node node = board.getNodes().stream() //find matching node
+                        .filter(n -> n.getId() == nodeId)
+                        .findFirst()
+                        .orElse(null);
+
+                if (node != null && //check node with player and contains settlement
+                        node.getOwner() == this &&
+                        node.getBuilding() == BuildingType.SETTLEMENT) {
+
+                    chosenNode = node;
+
+                } else {
+                    System.out.println("You must choose one of your settlements.");
+                }
+
+            } catch (NumberFormatException e) {
+                System.out.println("Enter a valid number.");
+            }
+        }
+
+        return chosenNode;
+    }
 }
 
