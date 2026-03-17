@@ -1,4 +1,4 @@
-package A3;
+package A2;
 
 import java.util.EnumMap;
 import java.util.Map;
