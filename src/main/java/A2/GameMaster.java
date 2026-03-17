@@ -1,4 +1,4 @@
-package A3;
+package A2;
 
 public class GameMaster {
 

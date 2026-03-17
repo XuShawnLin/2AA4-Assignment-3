@@ -1,4 +1,4 @@
-package A3;
+package A2;
 
 /**
  * Enumeration representing different resource types in the game.
