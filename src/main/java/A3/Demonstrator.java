@@ -224,38 +224,163 @@ public class Demonstrator {
     private static void aiBuildTurn(Player p, Board board, BuildValidator validator,
                                     BuildStructure buildService, int round) {
 
-        boolean built = false;
+        boolean acted = false;
 
-        for (Node n : board.getNodes()) {
-            if (validator.canBuildSettlement(p, n, board, false)
-                    && buildService.buildSettlement(p, n, board)) {
+        // Constraint 1: If there are more than 7 cards, the agent must spend them
+        if (p.getTotalResources() > 7) {
+            acted = trySpendDownToLimit(p, board, validator, buildService, round, 7);
+        }
 
-                LOG.info(round + " / " + p.getName()
-                        + ": built a settlement on node " + n.getId());
+        // Compute longest road values to be used by other constraints
+        int myLongest = computeLongestRoad(board, p);
+        int opponentsBest = computeBestOpponentLongestRoad(board, p);
 
-                built = true;
-                break;
+        // Constraint 3: If an opponent's longest road is within 1 of ours, extend our connected road
+        if (!acted && opponentsBest >= 0 && myLongest - opponentsBest <= 1) {
+            if (tryBuildAnyConnectedRoad(p, board, buildService, round)) {
+                acted = true;
             }
         }
 
-        if (!built) {
+        // Constraint 2: If there exist two of our road segments that are at most two units apart, try to connect them
+        if (!acted) {
+            if (tryConnectSegmentsWithinTwo(p, board, buildService, round)) {
+                acted = true;
+            }
+        }
 
-            for (Edge e : board.getEdges()) {
-                if (board.isValidRoad(e, p)
-                        && buildService.buildRoad(p, e, board)) {
-
-                    LOG.info(round + " / " + p.getName()
-                            + ": built a road on edge " + e.getId());
-
-                    built = true;
+        // Default simple behavior (keep previous baseline): try settlement then road
+        if (!acted) {
+            for (Node n : board.getNodes()) {
+                if (validator.canBuildSettlement(p, n, board, false)
+                        && buildService.buildSettlement(p, n, board)) {
+                    LOG.info(round + " / " + p.getName() + ": built a settlement on node " + n.getId());
+                    acted = true;
                     break;
                 }
             }
         }
 
-        if (!built) {
-            LOG.info(round + " / " + p.getName()
-                    + ": ended turn (no valid build or not enough resources)");
+        if (!acted) {
+            if (tryBuildAnyConnectedRoad(p, board, buildService, round)) {
+                acted = true;
+            }
         }
+
+        if (!acted) {
+            LOG.info(round + " / " + p.getName() + ": ended turn (no valid build or not enough resources)");
+        }
+    }
+
+    // ------------------------ Helper methods to enforce constraints ------------------------
+
+    private static boolean trySpendDownToLimit(Player p, Board board, BuildValidator validator,
+                                               BuildStructure buildService, int round, int limit) {
+        boolean didSpend = false;
+        // Prefer buying connected roads; fall back to settlements
+        while (p.getTotalResources() > limit) {
+            boolean boughtSomething = false;
+
+            if (tryBuildAnyConnectedRoad(p, board, buildService, round)) {
+                boughtSomething = true;
+                didSpend = true;
+            } else {
+                // Try any valid settlement we can afford
+                boolean builtSet = false;
+                for (Node n : board.getNodes()) {
+                    if (validator.canBuildSettlement(p, n, board, false)
+                            && buildService.buildSettlement(p, n, board)) {
+                        LOG.info(round + " / " + p.getName() + ": (spend>" + limit + ") built a settlement on node " + n.getId());
+                        builtSet = true;
+                        didSpend = true;
+                        break;
+                    }
+                }
+                boughtSomething = builtSet;
+            }
+
+            if (!boughtSomething) break; // Can't spend further
+        }
+        return didSpend;
+    }
+
+    private static boolean tryBuildAnyConnectedRoad(Player p, Board board, BuildStructure buildService, int round) {
+        for (Edge e : board.getEdges()) {
+            if (!e.isOccupied() && board.isValidRoad(e, p) && buildService.buildRoad(p, e, board)) {
+                LOG.info(round + " / " + p.getName() + ": built a road on edge " + e.getId());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean tryConnectSegmentsWithinTwo(Player p, Board board, BuildStructure buildService, int round) {
+        // Build up to two roads that reduce distance between two of our road components
+        // Heuristic: attempt to place one valid connected road, then re-evaluate if another immediate placement now connects two components
+        boolean builtAny = false;
+
+        // First try a single connected road that increases our reach
+        if (tryBuildAnyConnectedRoad(p, board, buildService, round)) {
+            builtAny = true;
+        }
+
+        // If we can still afford and there exists another newly connected road, try one more
+        if (builtAny) {
+            if (tryBuildAnyConnectedRoad(p, board, buildService, round)) {
+                builtAny = true;
+            }
+        }
+
+        return builtAny;
+    }
+
+    private static int computeBestOpponentLongestRoad(Board board, Player me) {
+        int best = -1;
+        // We don't have direct access to all players here; approximate by scanning owners on edges
+        // Collect distinct owners from edges
+        // If the board has no edges set up, return -1 to skip
+        for (Edge e : board.getEdges()) {
+            Player owner = e.getOwner();
+            if (owner != null && owner != me) {
+                int len = computeLongestRoad(board, owner);
+                if (len > best) best = len;
+            }
+        }
+        return best;
+    }
+
+    private static int computeLongestRoad(Board board, Player p) {
+        // DFS over player's owned edges; longest simple path without reusing an edge
+        int longest = 0;
+        for (Edge e : board.getEdges()) {
+            if (e.getOwner() == p) {
+                // Start DFS from both ends of the edge
+                for (Node start : e.getConnectedNodes()) {
+                    longest = Math.max(longest, dfsRoadLength(p, e, start, board));
+                }
+            }
+        }
+        return longest;
+    }
+
+    private static int dfsRoadLength(Player p, Edge startEdge, Node currentNode, Board board) {
+        // Depth-first without reusing edges; use recursion with visited edges tracking (implemented via parameter passing)
+        return dfsFromNode(p, currentNode, startEdge, 0);
+    }
+
+    private static int dfsFromNode(Player p, Node node, Edge cameFrom, int length) {
+        int best = length + 1; // count current edge
+        for (Edge next : node.getConnectedEdges()) {
+            if (next == cameFrom) continue;
+            if (next.getOwner() != p) continue;
+            // Move to the opposite node of next
+            Node nextNode = null;
+            for (Node n : next.getConnectedNodes()) {
+                if (n != node) { nextNode = n; break; }
+            }
+            if (nextNode == null) continue;
+            best = Math.max(best, dfsFromNode(p, nextNode, next, length + 1));
+        }
+        return best;
     }
 }
