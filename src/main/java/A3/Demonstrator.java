@@ -267,13 +267,7 @@ public class Demonstrator {
         }
     }
 
-    /**
-     * Randomly selects one rule from the list of best rules.
-     * Returns null if the list is empty so the AI can skip its turn.
-     *
-     * ThreadLocalRandom.current() is safe here because it is only used
-     * for game AI tie-breaking, not for security-sensitive operations.
-     */
+    @SuppressWarnings("java:S2245") // ThreadLocalRandom is safe here
     private static Rule chooseRandomRule(List<Rule> bestRules) {
         if (bestRules.isEmpty()) {
             return null;
