@@ -226,6 +226,7 @@ public class Demonstrator {
 
     private static Rule chooseRandomRule(List<Rule> bestRules) {
         // If there are no valid rules, return null (AI will skip turn)
+        // ThreadLocalRandom is safe here because it’s only for game AI tie-breaking
         if (bestRules.isEmpty()) {
             return null;
         }
