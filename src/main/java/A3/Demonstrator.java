@@ -6,10 +6,6 @@ import java.util.Random;
 import java.util.logging.Logger;
 import java.util.concurrent.ThreadLocalRandom;
 
-// Tie-breaking (random)
-Rule chosen = bestRules.get(ThreadLocalRandom.current().nextInt(bestRules.size()));
-
-
 public class Demonstrator {
     
     private static final Logger LOG = Logger.getLogger(Demonstrator.class.getName());
@@ -228,6 +224,10 @@ public class Demonstrator {
         }
     }
 
+    private static Rule chooseRandomRule(List<Rule> bestRules) {
+        return bestRules.get(ThreadLocalRandom.current().nextInt(bestRules.size()));
+    }
+    
     private static void aiBuildTurn(Player p, Board board,
                                     BuildValidator validator,
                                     BuildStructure buildService, int round) {
@@ -254,8 +254,7 @@ public class Demonstrator {
             }
         }
 
-        // Tie-breaking (random)
-        Rule chosen = bestRules.get(new Random().nextInt(bestRules.size()));
+        Rule chosen = chooseRandomRule(bestRules);
 
         boolean success = chosen.apply(p, board, buildService, round);
 
