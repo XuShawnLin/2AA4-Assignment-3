@@ -224,19 +224,11 @@ public class Demonstrator {
         }
     }
 
-    private static Rule chooseRandomRule(List<Rule> bestRules) {
-        // If there are no valid rules, return null (AI will skip turn)
-        // ThreadLocalRandom is safe here because it’s only for game AI tie-breaking
-        if (bestRules.isEmpty()) {
-            return null;
-        }
-        return bestRules.get(ThreadLocalRandom.current().nextInt(bestRules.size()));
-    }
-    
     private static void aiBuildTurn(Player p, Board board,
-                                    BuildValidator validator,
-                                    BuildStructure buildService, int round) {
+                                BuildValidator validator,
+                                BuildStructure buildService, int round) {
 
+        // Define the AI rules to evaluate
         List<Rule> rules = List.of(
                 new BuildSettlementRule(validator),
                 new BuildRoadRule(),
@@ -245,11 +237,11 @@ public class Demonstrator {
 
         double bestValue = -1;
         List<Rule> bestRules = new ArrayList<>();
-
-        // Evaluate all rules
+    
+        // Evaluate all rules to find the best ones
         for (Rule r : rules) {
             double val = r.evaluate(p, board);
-
+    
             if (val > bestValue) {
                 bestValue = val;
                 bestRules.clear();
@@ -259,21 +251,33 @@ public class Demonstrator {
             }
         }
 
+        // Tie-breaking: choose a random rule among the best rules
         Rule chosen = chooseRandomRule(bestRules);
-
-        boolean success = chosen.apply(p, board, buildService, round);
-
+    
         if (chosen != null) {
+            // Apply the chosen rule; if it fails, log a fine-level message
             boolean success = chosen.apply(p, board, buildService, round);
-        
             if (!success) {
-                LOG.info("No valid action executed for " + p.getName());
+                LOG.fine("No valid action executed for " + p.getName());
             }
-        } 
-        else {
-            // No valid rules, just skip AI action silently
+        } else {
+            // No valid rules available; AI skips turn silently
             LOG.fine(p.getName() + " has no actions this turn.");
         }
+    }
+
+    /**
+     * Randomly selects one rule from the list of best rules.
+     * Returns null if the list is empty so the AI can skip its turn.
+     *
+     * ThreadLocalRandom.current() is safe here because it is only used
+     * for game AI tie-breaking, not for security-sensitive operations.
+     */
+    private static Rule chooseRandomRule(List<Rule> bestRules) {
+        if (bestRules.isEmpty()) {
+            return null;
+        }
+        return bestRules.get(ThreadLocalRandom.current().nextInt(bestRules.size()));
     }
 
     // ------------------------ Helper methods to enforce constraints ------------------------
