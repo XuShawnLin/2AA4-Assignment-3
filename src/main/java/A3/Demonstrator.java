@@ -9,8 +9,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 
 public class Demonstrator {
-    // Tie-breaking (random)
-    Rule chosen = bestRules.get(ThreadLocalRandom.current().nextInt(bestRules.size()));
     
     private static final Logger LOG = Logger.getLogger(Demonstrator.class.getName());
 
