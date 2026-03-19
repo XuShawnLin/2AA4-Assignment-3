@@ -1,6 +1,8 @@
 package A3;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.logging.Logger;
 
 public class Demonstrator {
@@ -221,60 +223,45 @@ public class Demonstrator {
         }
     }
 
-    private static void aiBuildTurn(Player p, Board board, BuildValidator validator,
+    private static void aiBuildTurn(Player p, Board board,
+                                    BuildValidator validator,
                                     BuildStructure buildService, int round) {
 
-        boolean acted = false;
+        List<Rule> rules = List.of(
+                new BuildSettlementRule(validator),
+                new BuildRoadRule(),
+                new SpendCardsRule()
+        );
 
-        // Constraint 1: If there are more than 7 cards, the agent must spend them
-        if (p.getTotalResources() > 7) {
-            acted = trySpendDownToLimit(p, board, validator, buildService, round, 7);
-        }
+        double bestValue = -1;
+        List<Rule> bestRules = new ArrayList<>();
 
-        // Compute longest road values to be used by other constraints
-        int myLongest = computeLongestRoad(board, p);
-        int opponentsBest = computeBestOpponentLongestRoad(board, p);
+        // Evaluate all rules
+        for (Rule r : rules) {
+            double val = r.evaluate(p, board);
 
-        // Constraint 3: If an opponent's longest road is within 1 of ours, extend our connected road
-        if (!acted && opponentsBest >= 0 && myLongest - opponentsBest <= 1) {
-            if (tryBuildAnyConnectedRoad(p, board, buildService, round)) {
-                acted = true;
+            if (val > bestValue) {
+                bestValue = val;
+                bestRules.clear();
+                bestRules.add(r);
+            } else if (val == bestValue) {
+                bestRules.add(r);
             }
         }
 
-        // Constraint 2: If there exist two of our road segments that are at most two units apart, try to connect them
-        if (!acted) {
-            if (tryConnectSegmentsWithinTwo(p, board, buildService, round)) {
-                acted = true;
-            }
-        }
+        // Tie-breaking (random)
+        Rule chosen = bestRules.get(new Random().nextInt(bestRules.size()));
 
-        // Default simple behavior (keep previous baseline): try settlement then road
-        if (!acted) {
-            for (Node n : board.getNodes()) {
-                if (validator.canBuildSettlement(p, n, board, false)
-                        && buildService.buildSettlement(p, n, board)) {
-                    LOG.info(round + " / " + p.getName() + ": built a settlement on node " + n.getId());
-                    acted = true;
-                    break;
-                }
-            }
-        }
+        boolean success = chosen.apply(p, board, buildService, round);
 
-        if (!acted) {
-            if (tryBuildAnyConnectedRoad(p, board, buildService, round)) {
-                acted = true;
-            }
-        }
-
-        if (!acted) {
-            LOG.info(round + " / " + p.getName() + ": ended turn (no valid build or not enough resources)");
+        if (!success) {
+            System.out.println("No valid action executed.");
         }
     }
 
     // ------------------------ Helper methods to enforce constraints ------------------------
 
-    private static boolean trySpendDownToLimit(Player p, Board board, BuildValidator validator,
+    protected static boolean trySpendDownToLimit(Player p, Board board, BuildValidator validator,
                                                BuildStructure buildService, int round, int limit) {
         boolean didSpend = false;
         // Prefer buying connected roads; fall back to settlements
