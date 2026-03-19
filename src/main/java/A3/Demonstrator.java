@@ -4,6 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.logging.Logger;
+import java.util.concurrent.ThreadLocalRandom;
+
+// Tie-breaking (random)
+Rule chosen = bestRules.get(ThreadLocalRandom.current().nextInt(bestRules.size()));
 
 public class Demonstrator {
 
