@@ -230,6 +230,7 @@ public class Demonstrator {
 
         // Define the AI rules to evaluate
         List<Rule> rules = List.of(
+                // Build settlement rule; random tie-breaking will be safe
                 new BuildSettlementRule(validator),
                 new BuildRoadRule(),
                 new SpendCardsRule()
