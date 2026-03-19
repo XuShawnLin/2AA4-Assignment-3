@@ -225,6 +225,10 @@ public class Demonstrator {
     }
 
     private static Rule chooseRandomRule(List<Rule> bestRules) {
+        // If there are no valid rules, return null (AI will skip turn)
+        if (bestRules.isEmpty()) {
+            return null;
+        }
         return bestRules.get(ThreadLocalRandom.current().nextInt(bestRules.size()));
     }
     
@@ -258,8 +262,16 @@ public class Demonstrator {
 
         boolean success = chosen.apply(p, board, buildService, round);
 
-        if (!success) {
-            System.out.println("No valid action executed.");
+        if (chosen != null) {
+            boolean success = chosen.apply(p, board, buildService, round);
+        
+            if (!success) {
+                LOG.info("No valid action executed for " + p.getName());
+            }
+        } 
+        else {
+            // No valid rules, just skip AI action silently
+            LOG.fine(p.getName() + " has no actions this turn.");
         }
     }
 
